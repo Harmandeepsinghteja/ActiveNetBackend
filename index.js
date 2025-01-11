@@ -683,6 +683,7 @@ app.get("/upcoming", async (req, res) => {
       requests: game.requests,
       isBooked: game.isBooked,
       adminName: `${game.admin.firstName} ${game.admin.lastName}`,
+      isUserAdmin: game.admin._id.toString() === userId,
       adminUrl: game.admin.image,
       matchFull: game.matchFull,
     }));
@@ -690,5 +691,72 @@ app.get("/upcoming", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to Fetch game" });
+  }
+});
+
+app.post("/games/:gameId/request", async (req, res) => {
+  try {
+    const { userId, comment } = req.body;
+    const { gameId } = req.params;
+    const game = await Game.findById(gameId);
+    if (!game) {
+      return res.status(404).json({ message: "Game Not Found" });
+    }
+    const existingRequest = game.requests.find(
+      (request) => request.userId.toString() === userId
+    );
+    if (existingRequest) {
+      return res.status(400).json({ message: "Request Already Sent" });
+    }
+    game.requests.push({ userId, comment });
+    await game.save();
+    res.status(200).json({ message: "Request Sent Successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to Send request" });
+  }
+});
+
+app.get("/games/:gameId/requests", async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const game = await Game.findById(gameId).populate({
+      path: "requests.userId",
+      select: "email firstName lastName image skill noOfGames playpals sports",
+    });
+    if (!game) {
+      return res.status(404).json({ message: "Game Not Found" });
+    }
+    const requestWithUserInfo = game.requests.map((request) => ({
+      userId: request.userId._id,
+      email: request.userId.email,
+      firstName: request.userId.firstName,
+      lastName: request.userId.lastName,
+      image: request.userId.image,
+      skill: request.userId.skill,
+      noOfGames: request.userId.noOfGames,
+      playpals: request.userId.playpals,
+      sports: request.userId.sports,
+      comment: request.comment,
+    }));
+    res.status(200).json(requestWithUserInfo);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to get the Requests" });
+  }
+});
+
+app.get("/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User Not Found" });
+    }
+    return res.status(200).json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch user" });
   }
 });
